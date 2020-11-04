@@ -22,13 +22,13 @@ const Stopwatch = () => {
   const [stopWatchActive, setStopWatchActive] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const currentTimeText = useMemo(() => {
-    return `${Math.round(currentTime)}s`;
-  }, [currentTime]);
-  const arcAngle = useRef(new Reanimated.Value<number>(0));
+    return `${Math.round(duration - currentTime)}s`;
+  }, [currentTime, duration]);
+  const arcAngle = useRef(new Reanimated.Value<number>(360));
 
   useCode(() => {
     return call([arcAngle.current], ([arcAngleCurrent]) => {
-      setCurrentTime((arcAngleCurrent * duration) / 360);
+      setCurrentTime(((360 - arcAngleCurrent) * duration) / 360);
     });
   }, []);
 
@@ -43,7 +43,7 @@ const Stopwatch = () => {
     } else {
       setStopWatchActive(true);
       Reanimated.timing(arcAngle.current, {
-        toValue: 360,
+        toValue: 0,
         easing: Easing.inOut(Easing.linear),
         duration: (duration - currentTime) * 1000,
       }).start(({finished}) => {
@@ -53,7 +53,7 @@ const Stopwatch = () => {
           console.log('O tempo acabou, executar próxima tarefa');
 
           Reanimated.timing(arcAngle.current, {
-            toValue: 0,
+            toValue: 360,
             easing: Easing.inOut(Easing.quad),
             duration: 200,
           }).start();
@@ -65,7 +65,7 @@ const Stopwatch = () => {
   const stopCounting = () => {
     setStopWatchActive(false);
     Reanimated.timing(arcAngle.current, {
-      toValue: 0,
+      toValue: 360,
       easing: Easing.inOut(Easing.quad),
       duration: 200,
     }).start();
