@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   StyleSheet,
@@ -17,8 +17,35 @@ import Svg, {Circle} from 'react-native-svg';
 const {width, height} = Dimensions.get('window');
 const diameter = Math.min(width, height) - 80;
 
+interface Step {
+  duration: number;
+  label: string;
+}
+
 const Stopwatch = () => {
-  const [duration, setDuration] = useState(10);
+  const [steps, setSteps] = useState<Step[]>([
+    {
+      duration: 5,
+      label: 'Ligar Chuveiro',
+    },
+    {
+      duration: 15,
+      label: 'Passar Sabonete',
+    },
+    {
+      duration: 10,
+      label: 'Enxaguar',
+    },
+  ]);
+  const [currentStep, setCurrentStep] = useState(0);
+
+  const duration = useMemo(() => {
+    return steps[currentStep].duration;
+  }, [currentStep, steps]);
+  const stepLabel = useMemo(() => {
+    return steps[currentStep].label;
+  }, [currentStep, steps]);
+
   const [stopWatchActive, setStopWatchActive] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const currentTimeText = useMemo(() => {
@@ -30,46 +57,60 @@ const Stopwatch = () => {
     return call([arcAngle.current], ([arcAngleCurrent]) => {
       setCurrentTime(((360 - arcAngleCurrent) * duration) / 360);
     });
-  }, []);
+  }, [duration]);
 
-  const startOrPauseCounting = useCallback(() => {
-    if (stopWatchActive) {
-      setStopWatchActive(false);
-      Reanimated.timing(arcAngle.current, {
-        toValue: arcAngle.current,
-        easing: Easing.inOut(Easing.linear),
-        duration: 1,
-      }).start();
-    } else {
-      setStopWatchActive(true);
-      Reanimated.timing(arcAngle.current, {
-        toValue: 0,
-        easing: Easing.inOut(Easing.linear),
-        duration: (duration - currentTime) * 1000,
-      }).start(({finished}) => {
-        setStopWatchActive(false);
-
-        if (finished) {
-          console.log('O tempo acabou, executar próxima tarefa');
-
-          Reanimated.timing(arcAngle.current, {
-            toValue: 360,
-            easing: Easing.inOut(Easing.quad),
-            duration: 200,
-          }).start();
-        }
-      });
-    }
-  }, [currentTime, duration, stopWatchActive]);
-
-  const stopCounting = () => {
+  const stopCounting = useCallback(() => {
     setStopWatchActive(false);
+    setCurrentStep(0);
+
     Reanimated.timing(arcAngle.current, {
       toValue: 360,
       easing: Easing.inOut(Easing.quad),
       duration: 200,
     }).start();
-  };
+  }, []);
+
+  const pauseCounting = useCallback(() => {
+    setStopWatchActive(false);
+    Reanimated.timing(arcAngle.current, {
+      toValue: arcAngle.current,
+      easing: Easing.inOut(Easing.linear),
+      duration: 1,
+    }).start();
+  }, []);
+
+  const startCounting = useCallback(() => {
+    setStopWatchActive(true);
+    console.log(duration);
+
+    Reanimated.timing(arcAngle.current, {
+      toValue: 0,
+      easing: Easing.inOut(Easing.linear),
+      duration: (duration - currentTime) * 1000,
+    }).start(({finished}) => {
+      if (finished) {
+        setStopWatchActive(false);
+
+        console.log('O tempo acabou, executar próxima tarefa');
+        Reanimated.timing(arcAngle.current, {
+          toValue: 360,
+          easing: Easing.inOut(Easing.quad),
+          duration: 200,
+        }).start(() => {
+          setCurrentStep((value) => value + 1);
+        });
+      }
+    });
+  }, [currentTime, duration]);
+
+  useEffect(() => {
+    console.log('entrei');
+
+    if (currentStep === 0 || currentStep >= steps.length) {
+      return;
+    }
+    // startCounting();
+  }, [currentStep, steps.length]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -105,13 +146,13 @@ const Stopwatch = () => {
           />
           <View style={[styles.absolute, styles.insideWatchContainer]}>
             <Text style={styles.time}>{currentTimeText}</Text>
-            <Text style={styles.timeDescription}>Ligar Chuveiro</Text>
+            <Text style={styles.timeDescription}>{stepLabel}</Text>
           </View>
         </View>
         <View style={styles.buttonsContainer}>
           <TouchableOpacity
             style={styles.buttonContainer}
-            onPress={startOrPauseCounting}>
+            onPress={stopWatchActive ? pauseCounting : startCounting}>
             <Text style={styles.buttonText}>
               {stopWatchActive ? 'Pausar' : 'Iniciar'}
             </Text>
