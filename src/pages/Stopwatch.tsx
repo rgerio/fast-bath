@@ -40,28 +40,32 @@ const Stopwatch = () => {
   const [currentStep, setCurrentStep] = useState(0);
 
   const duration = useMemo(() => {
-    return steps[currentStep].duration;
+    return currentStep >= steps.length ? 0 : steps[currentStep].duration;
   }, [currentStep, steps]);
   const stepLabel = useMemo(() => {
-    return steps[currentStep].label;
+    return currentStep >= steps.length ? '' : steps[currentStep].label;
   }, [currentStep, steps]);
 
   const [stopWatchActive, setStopWatchActive] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [pauseTime, setPauseTime] = useState(0);
   const currentTimeText = useMemo(() => {
-    return `${Math.round(duration - currentTime)}s`;
+    const calculatedTime = Math.round(duration - currentTime);
+    return calculatedTime < 0 ? '--' : `${calculatedTime}s`;
   }, [currentTime, duration]);
   const arcAngle = useRef(new Reanimated.Value<number>(360));
 
   useCode(() => {
     return call([arcAngle.current], ([arcAngleCurrent]) => {
-      setCurrentTime(((360 - arcAngleCurrent) * duration) / 360);
+      const calculatedTime = ((360 - arcAngleCurrent) * duration) / 360;
+      setCurrentTime(calculatedTime);
     });
   }, [duration]);
 
   const stopCounting = useCallback(() => {
     setStopWatchActive(false);
     setCurrentStep(0);
+    setPauseTime(0);
 
     Reanimated.timing(arcAngle.current, {
       toValue: 360,
@@ -72,45 +76,48 @@ const Stopwatch = () => {
 
   const pauseCounting = useCallback(() => {
     setStopWatchActive(false);
+    setPauseTime(currentTime);
+
     Reanimated.timing(arcAngle.current, {
       toValue: arcAngle.current,
       easing: Easing.inOut(Easing.linear),
       duration: 1,
     }).start();
-  }, []);
+  }, [currentTime]);
 
   const startCounting = useCallback(() => {
     setStopWatchActive(true);
-    console.log(duration);
 
     Reanimated.timing(arcAngle.current, {
       toValue: 0,
       easing: Easing.inOut(Easing.linear),
-      duration: (duration - currentTime) * 1000,
+      duration: (duration - pauseTime) * 1000,
     }).start(({finished}) => {
       if (finished) {
-        setStopWatchActive(false);
-
-        console.log('O tempo acabou, executar próxima tarefa');
         Reanimated.timing(arcAngle.current, {
           toValue: 360,
           easing: Easing.inOut(Easing.quad),
           duration: 200,
         }).start(() => {
-          setCurrentStep((value) => value + 1);
+          setPauseTime(0);
+          setCurrentStep((stepValue) => stepValue + 1);
         });
       }
     });
-  }, [currentTime, duration]);
+  }, [duration, pauseTime]);
 
   useEffect(() => {
-    console.log('entrei');
-
-    if (currentStep === 0 || currentStep >= steps.length) {
+    if (currentStep >= steps.length) {
+      stopCounting();
       return;
     }
-    // startCounting();
-  }, [currentStep, steps.length]);
+
+    if (currentStep === 0 || !stopWatchActive) {
+      return;
+    }
+
+    startCounting();
+  }, [currentStep, startCounting, stopCounting, steps.length, stopWatchActive]);
 
   return (
     <SafeAreaView style={styles.container}>
